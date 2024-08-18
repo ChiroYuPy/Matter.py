@@ -17,17 +17,15 @@ This script implements the Matter.py physics engine to simulate and display a 2D
 4. **Graphical Interface**:
    - The simulation window is 800x600 pixels, displaying the moving bodies according to the physical laws.
 
-The script combines Pyglet for graphical rendering with the Matter.py engine for physical simulation, providing a real-time interactive experience with realistic collisions and movement.
+The script combines Pygame for graphical rendering with the Matter.py engine for physical simulation, providing a real-time interactive experience with realistic collisions and movement.
 
 """
 
 import math
 
-# pyglet imports
-from pyglet import shapes
-from pyglet.clock import schedule_interval
-from pyglet.window import Window
-from pyglet.app import run
+# Pygame imports
+import pygame
+from pygame.locals import QUIT
 
 # Matter.py imports
 from body import Body
@@ -60,33 +58,55 @@ slope = Body(Box(200, 20), static_matter, 200, 200, is_static=True, angle=math.r
 # add bodies to the world
 world.add_body([body1, body2, ground, slope])
 
+################################# Pygame Initialization #################################
 
-################################# Pyglet Initialization #################################
+# initialize Pygame
+pygame.init()
 
 # window creation
-window = Window(800, 600, "Matter.py")
+window_size = (800, 600)
+screen = pygame.display.set_mode(window_size)
+pygame.display.set_caption("Matter.py")
+
+
+# color definitions
+def get_color_tuple(color):
+    return (color[0], color[1], color[2])
+
 
 # update world
 def update(dt):
     world.step(dt, iterations=8)
 
-schedule_interval(update, 1/60)
 
-# draw bodies
-@window.event
-def on_draw():
-    window.clear()
+# main loop
+clock = pygame.time.Clock()
+running = True
 
+while running:
+    dt = clock.tick(60) / 1000.0
+    update(dt)
+
+    for event in pygame.event.get():
+        if event.type == QUIT:
+            running = False
+
+    # clear the screen
+    screen.fill((0, 0, 0))
+
+    # draw bodies
     for body in world.bodies:
+        color = get_color_tuple(body.matter.color)
 
         if body.shape.type == ShapeType.CIRCLE:
-            shapes.Circle(body.position.x, body.position.y, body.shape.radius, color=body.matter.color).draw()
+            pygame.draw.circle(screen, color, (int(body.position.x), int(body.position.y)), body.shape.radius)
 
         elif body.shape.type == ShapeType.BOX:
-            box_shape = shapes.Rectangle(body.position.x, body.position.y, body.shape.width, body.shape.height, color=body.matter.color)
-            box_shape.anchor_position = body.shape.width / 2, body.shape.height / 2
-            box_shape.rotation = -math.degrees(body.angle)
-            box_shape.draw()
 
-# run the app
-run()
+            corners = body.get_vertices(tuple=True)
+            pygame.draw.polygon(screen, color, corners)
+
+    # update the display
+    pygame.display.flip()
+
+pygame.quit()

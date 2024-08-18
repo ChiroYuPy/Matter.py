@@ -23,11 +23,9 @@ The script combines Pyglet for graphical rendering with the Matter.py engine for
 
 import math
 
-# pyglet imports
-from pyglet import shapes
-from pyglet.clock import schedule_interval
-from pyglet.window import Window, mouse
-from pyglet.app import run
+# Pygame imports
+import pygame
+from pygame.locals import QUIT, MOUSEBUTTONDOWN, MOUSEBUTTONUP, MOUSEMOTION, MOUSEWHEEL
 
 # Matter.py imports
 from body import Body
@@ -61,50 +59,83 @@ slope = Body(Box(200, 20), static_matter, 200, 200, is_static=True, angle=math.r
 # add bodies to the world
 world.add_body([body1, body2, ground, slope])
 
+################################# Pygame Initialization #################################
 
-################################# Pyglet Initialization #################################
+# initialize Pygame
+pygame.init()
 
 # window creation
-window = Window(800, 600, "Matter.py")
+window_size = (800, 600)
+screen = pygame.display.set_mode(window_size)
+pygame.display.set_caption("Matter.py")
+
+
+# color definitions
+def get_color_tuple(color):
+    return (color[0], color[1], color[2])
+
 
 # camera creation
-camera = Camera(window.width / 2, window.height / 2)
+camera = Camera(window_size[0] / 2, window_size[1] / 2)
+
 
 # update world
 def update(dt):
     world.step(dt, iterations=8)
 
-schedule_interval(update, 1/60)
 
-# draw bodies
-@window.event
-def on_draw():
-    window.clear()
+# main loop
+clock = pygame.time.Clock()
+running = True
+mouse_drag = False
 
+while running:
+    dt = clock.tick(60) / 1000.0  # Amount of seconds between each loop
+    update(dt)
+
+    for event in pygame.event.get():
+        if event.type == QUIT:
+            running = False
+        elif event.type == MOUSEBUTTONDOWN:
+            if event.button == 3:  # Right mouse button
+                mouse_drag = True
+        elif event.type == MOUSEBUTTONUP:
+            if event.button == 3:  # Right mouse button
+                mouse_drag = False
+        elif event.type == MOUSEMOTION:
+            if mouse_drag:
+                camera.move(-event.rel[0] / camera.zoom, -event.rel[1] / camera.zoom)
+        elif event.type == MOUSEWHEEL:
+            if event.y > 0:
+                camera.zoom_in()
+            else:
+                camera.zoom_out()
+
+    # clear the screen
+    screen.fill((0, 0, 0))
+
+    # draw bodies
     for body in world.bodies:
+        color = get_color_tuple(body.matter.color)
 
         if body.shape.type == ShapeType.CIRCLE:
             nx, ny = camera.world_to_screen(body.position.x, body.position.y)
-            shapes.Circle(nx, ny, body.shape.radius * camera.zoom, color=body.matter.color).draw()
+            pygame.draw.circle(screen, color, (int(nx), int(ny)), int(body.shape.radius * camera.zoom))
 
         elif body.shape.type == ShapeType.BOX:
             nx, ny = camera.world_to_screen(body.position.x, body.position.y)
-            box_shape = shapes.Rectangle(nx, ny, body.shape.width * camera.zoom, body.shape.height * camera.zoom, color=body.matter.color)
-            box_shape.anchor_position = body.shape.width / 2 * camera.zoom, body.shape.height / 2 * camera.zoom
-            box_shape.rotation = -math.degrees(body.angle)
-            box_shape.draw()
+            box_rect = pygame.Rect(
+                int(nx - body.shape.width * camera.zoom / 2),
+                int(ny - body.shape.height * camera.zoom / 2),
+                int(body.shape.width * camera.zoom),
+                int(body.shape.height * camera.zoom)
+            )
+            rotated_surf = pygame.Surface(box_rect.size, pygame.SRCALPHA)
+            rotated_surf.fill(color)
+            rotated_surf = pygame.transform.rotate(rotated_surf, -math.degrees(body.angle))
+            screen.blit(rotated_surf, box_rect.topleft)
 
-@window.event
-def on_mouse_scroll(x, y, scroll_x, scroll_y):
-    if scroll_y > 0:
-        camera.zoom_in()
-    else:
-        camera.zoom_out()
+    # update the display
+    pygame.display.flip()
 
-@window.event
-def on_mouse_drag(x, y, dx, dy, buttons, modifiers):
-    if buttons == mouse.RIGHT:
-        camera.move(-dx / camera.zoom, -dy / camera.zoom)
-
-# run the app
-run()
+pygame.quit()
