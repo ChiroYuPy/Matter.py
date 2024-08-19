@@ -1,3 +1,4 @@
+from AABB import AABB
 from shape import ShapeType
 from transform import Transform
 from vector import Vector2
@@ -29,8 +30,12 @@ class Body:
             self.triangles = None
             self.transformed_vertices = None
 
+        self.AABB = None
+
         self.transform_update_required = True
         self.aabb_update_required = True
+
+
 
     @staticmethod
     def create_box_vertices(width, height):
@@ -68,6 +73,35 @@ class Body:
         else:
             return self.transformed_vertices
 
+    def get_AABB(self):
+        if self.aabb_update_required:
+            min_x, min_y = float('inf'), float('inf')
+            max_x, max_y = float('-inf'), float('-inf')
+
+            if self.shape.type is ShapeType.BOX:
+                vertices = self.get_transformed_vertices()
+
+                for v in vertices:
+                    min_x = min(min_x, v.x)
+                    min_y = min(min_y, v.y)
+                    max_x = max(max_x, v.x)
+                    max_y = max(max_y, v.y)
+
+            elif self.shape.type is ShapeType.CIRCLE:
+                min_x = self.position.x - self.shape.radius
+                min_y = self.position.y - self.shape.radius
+                max_x = self.position.x + self.shape.radius
+                max_y = self.position.y + self.shape.radius
+
+            else:
+                raise ValueError("Invalid shape type")
+
+            self.AABB = AABB(min_x, min_y, max_x, max_y)
+
+        self.aabb_update_required = False
+        return self.AABB
+
+
     def step(self, dt, gravity, iterations):
 
         if self.is_static:
@@ -83,7 +117,7 @@ class Body:
 
         self.angle += self.angular_velocity * dt
 
-        self.force = Vector2()
+        self.force.zero()
         self.transform_update_required = True
         self.aabb_update_required = True
 

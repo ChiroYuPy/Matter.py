@@ -32,9 +32,7 @@ class Vector2:
         return Vector2(self.x / scalar, self.y / scalar)
 
     def __rtruediv__(self, scalar: float) -> 'Vector2':
-        if self.x == 0 or self.y == 0:
-            raise ValueError("Division by zero.")
-        return Vector2(scalar / self.x, scalar / self.y)
+        raise NotImplementedError("Scalar division from the right is not supported for Vector2.")
 
     def __str__(self) -> str:
         return f"({self.x:.2f}, {self.y:.2f})"

@@ -1,8 +1,43 @@
+from AABB import AABB
 from shape import ShapeType
 from vector import Vector2
 
 
 class Collisions:
+
+    @staticmethod
+    def IntersectAABB(a, b):
+        if (a.max.x <= b.min.x or b.max.x <= a.min.x or
+            a.max.y <= b.min.y or b.max.y <= a.min.y):
+            return False
+        return True
+
+    @staticmethod
+    def FindContactPoints(bodyA, bodyB):
+        contact1 = Vector2()
+        contact2 = Vector2()
+        contact_count = 0
+
+        if bodyA.shape.type is ShapeType.BOX:
+            if bodyB.shape.type is ShapeType.BOX:
+                pass
+            elif bodyB.shape.type is ShapeType.CIRCLE:
+                pass
+        elif bodyA.shape.type is ShapeType.CIRCLE:
+            if bodyB.shape.type is ShapeType.BOX:
+                pass
+            elif bodyB.shape.type is ShapeType.CIRCLE:
+                contact1 = Collisions.FindContactPoint(bodyA.position, bodyA.shape.radius, bodyB.position)
+                contact_count = 1
+
+        return contact1, contact2, contact_count
+
+    @staticmethod
+    def FindContactPoint(centerA, radiusA, centerB):
+        ab = centerB - centerA
+        direction = ab.normalize()
+        contact_point = centerA + direction * radiusA
+        return contact_point
 
     @staticmethod
     def Collide(bodyA, bodyB):
@@ -38,9 +73,11 @@ class Collisions:
     @staticmethod
     def IntersectCirclePolygon(circle_center, circle_radius, polygon_center, polygon_vertices, invert_normal=False):
         normal, depth = Vector2(), float('inf')
+
         for i in range(len(polygon_vertices)):
             va, vb = polygon_vertices[i], polygon_vertices[(i + 1) % len(polygon_vertices)]
-            axis = Vector2(- (vb - va).y, (vb - va).x).normalize()
+            edge = vb - va
+            axis = Vector2(-edge.y, edge.x).normalize()
             minA, maxA = Collisions.ProjectVertices(polygon_vertices, axis)
             minB, maxB = Collisions.ProjectCircle(circle_center, circle_radius, axis)
 

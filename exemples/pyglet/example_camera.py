@@ -47,7 +47,7 @@ circle = Circle(25)
 cube = Box(40, 40)
 
 # matter creation
-dynamic_matter = Matter(1, color=(127, 160, 80))
+dynamic_matter = Matter(2, 0.6, color=(127, 160, 80))
 static_matter = Matter(color=(64, 64, 64))
 
 # dynamic bodies creation

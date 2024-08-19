@@ -39,19 +39,19 @@ from world import World
 ############################### Matter.py Initialization ###############################
 
 # world creation
-world = World(gravity=Vector2(0, -9.81))
+world = World(gravity=Vector2(0, -9.81*10))
 
 # shapes creation
 circle = Circle(25)
 cube = Box(40, 40)
 
 # matter creation
-dynamic_matter = Matter(1, color=(127, 160, 80))
-static_matter = Matter(color=(64, 64, 64))
+dynamic_matter = Matter(density=1, restitution=0.5, color=(127, 160, 80))
+static_matter = Matter(density=1, restitution=0.5, color=(64, 64, 64))
 
 # dynamic bodies creation
 body1 = Body(circle, dynamic_matter, 400, 400)
-body2 = Body(cube, dynamic_matter, 350, 350)
+body2 = Body(cube, dynamic_matter, 350, 350, angle=math.radians(30))
 
 # static bodies creation
 ground = Body(Box(768, 16), static_matter, 400, 24, is_static=True)
@@ -86,6 +86,17 @@ def on_draw():
             box_shape.anchor_position = body.shape.width / 2, body.shape.height / 2
             box_shape.rotation = -math.degrees(body.angle)
             box_shape.draw()
+
+@window.event
+def on_mouse_press(x, y, button, modifiers):
+    if button == 1:
+        body = Body(circle, dynamic_matter, x, y)
+        world.add_body(body)
+
+    elif button == 4:
+        body = Body(cube, dynamic_matter, x, y)
+        world.add_body(body)
+
 
 # run the app
 run()
