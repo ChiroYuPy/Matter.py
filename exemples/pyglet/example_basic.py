@@ -79,14 +79,10 @@ def on_draw():
 
     for body in world.bodies:
         if body.shape.type == ShapeType.CIRCLE:
-            # Draw a circle body
             shapes.Circle(body.position.x, body.position.y, body.shape.radius, color=body.matter.color).draw()
 
         elif body.shape.type == ShapeType.BOX:
-
-
-            box = shapes.Polygon(*body.get_vertices(tuple=True), color=body.matter.color)
-            box.draw()
+            shapes.Polygon(*body.get_vertices(tuple=True), color=body.matter.color).draw()
 
 # Event handler for mouse clicks to create new bodies
 @window.event

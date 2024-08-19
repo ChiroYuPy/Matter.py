@@ -11,8 +11,16 @@ class World:
     def __init__(self, gravity: Vector2 = Vector2(0, -9.81)):
         self.gravity = gravity
         self.bodies: List[Body] = []
-        self.contacts: List[Manifold] = []
-        self.contact_points: List[Vector2] = []
+        self.contact_pairs: List[(int, int)] = []
+
+        self.contact_points: List[tuple[int, int]] = []
+
+        self.contact_list: List[Vector2] = []
+        self.impulse_list: List[Vector2] = []
+        self.ra_list: List[Vector2] = []
+        self.rb_list: List[Vector2] = []
+        self.friction_impulse_list: List[Vector2] = []
+        self.j_list: List[float] = []
 
     @property
     def body_count(self) -> int:
@@ -53,54 +61,62 @@ class World:
 
         iterations = max(min(iterations, self.MAX_ITERATIONS), self.MIN_ITERATIONS)
 
-        self.contact_points.clear()
-
         for _ in range(iterations):
-            for body in self.bodies:
-                body.step(dt, self.gravity, iterations)
+            self.contact_list.clear()
+            self.step_bodies(dt, iterations)
+            self.broad_phase()
+            self.narrow_phase()
 
-            self.contacts.clear()
+    def broad_phase(self):
+        self.contact_pairs.clear()
+        for i in range(self.body_count - 1):
+            bodyA = self.bodies[i]
+            bodyA.AABB = bodyA.get_AABB()
 
-            for i in range(self.body_count - 1):
-                bodyA = self.bodies[i]
-                bodyA.AABB = bodyA.get_AABB()
+            for j in range(i + 1, self.body_count):
+                bodyB = self.bodies[j]
+                bodyB.AABB = bodyB.get_AABB()
 
-                for j in range(i + 1, self.body_count):
-                    bodyB = self.bodies[j]
-                    bodyB.AABB = bodyB.get_AABB()
+                if bodyA.is_static and bodyB.is_static:
+                    continue
 
-                    if bodyA.is_static and bodyB.is_static:
-                        continue
+                if not Collisions.intersect_aabbs(bodyA.AABB, bodyB.AABB):
+                    continue
 
-                    if not Collisions.IntersectAABB(bodyA.AABB, bodyB.AABB):
-                        continue
+                self.contact_pairs.append((i, j))
 
-                    collision, normal, depth = Collisions.Collide(bodyA, bodyB)
+    def narrow_phase(self):
+        for pair in self.contact_pairs:
+            i, j = pair
+            bodyA = self.bodies[i]
+            bodyB = self.bodies[j]
 
-                    if collision:
-                        if bodyA.is_static:
-                            bodyB.move(normal * depth)
-                        elif bodyB.is_static:
-                            bodyA.move(-normal * depth)
-                        else:
-                            bodyA.move(-normal * depth / 2)
-                            bodyB.move(normal * depth / 2)
+            collision, normal, depth = Collisions.collide(bodyA, bodyB)
 
-                        contact1, contact2, contact_count = Collisions.FindContactPoints(bodyA, bodyB)
-                        contact = Manifold(bodyA, bodyB, normal, depth, contact1, contact2, contact_count)
-                        self.contacts.append(contact)
+            if collision:
 
-            for contact in self.contacts:
-                self.resolve_collision(contact)
+                self.separate_bodies(bodyA, bodyB, normal * depth)
+                contact1, contact2, contact_count = Collisions.find_contact_points(bodyA, bodyB)
+                contact = Manifold(bodyA, bodyB, normal, depth, contact1, contact2, contact_count)
+                # self.resolve_collision_basic(contact)
+                self.resolve_collision_with_rotation_and_friction(contact)
 
-                if contact.contact_count > 0:
-                    self.contact_points.append(contact.contact1)
-                    if contact.contact_count > 1:
-                        self.contact_points.append(contact.contact2)
+    def step_bodies(self, dt: float, total_iterations: int):
+        for body in self.bodies:
+            body.step(dt, self.gravity, total_iterations)
 
     @staticmethod
-    def resolve_collision(contact: Manifold):
+    def separate_bodies(bodyA, bodyB, mtv):
+        if bodyA.is_static:
+            bodyB.move(mtv)
+        elif bodyB.is_static:
+            bodyA.move(-mtv)
+        else:
+            bodyA.move(-mtv / 2)
+            bodyB.move(mtv / 2)
 
+    @staticmethod
+    def resolve_collision_basic(contact: Manifold):
 
         bodyA = contact.bodyA
         bodyB = contact.bodyB
@@ -119,3 +135,183 @@ class World:
 
         bodyA.linear_velocity -= impulse * bodyA.inv_mass
         bodyB.linear_velocity += impulse * bodyB.inv_mass
+
+    def resolve_collision_with_rotation(self, contact: Manifold):
+        body_a = contact.bodyA
+        body_b = contact.bodyB
+        normal = contact.normal
+        contact1 = contact.contact1
+        contact2 = contact.contact2
+        contact_count = contact.contact_count
+
+        e = min(body_a.matter.restitution, body_b.matter.restitution)
+
+        self.contact_list = [contact1, contact2]
+
+        self.impulse_list = [Vector2() for _ in range(contact_count)]
+        self.ra_list = [Vector2() for _ in range(contact_count)]
+        self.rb_list = [Vector2() for _ in range(contact_count)]
+
+        for i in range(contact_count):
+            ra = self.contact_list[i] - body_a.position
+            rb = self.contact_list[i] - body_b.position
+
+            self.ra_list[i] = ra
+            self.rb_list[i] = rb
+
+            ra_perp = Vector2(-ra.y, ra.x)
+            rb_perp = Vector2(-rb.y, rb.x)
+
+            angular_linear_velocity_a = ra_perp * body_a.angular_velocity
+            angular_linear_velocity_b = rb_perp * body_b.angular_velocity
+
+            relative_velocity = (body_b.linear_velocity + angular_linear_velocity_b) - \
+                                (body_a.linear_velocity + angular_linear_velocity_a)
+
+            contact_velocity_mag = relative_velocity.dot(normal)
+
+            if contact_velocity_mag > 0:
+                continue
+
+            ra_perp_dot_n = ra_perp.dot(normal)
+            rb_perp_dot_n = rb_perp.dot(normal)
+
+            denom = (body_a.inv_mass + body_b.inv_mass +
+                     (ra_perp_dot_n * ra_perp_dot_n) * body_a.inv_inertia +
+                     (rb_perp_dot_n * rb_perp_dot_n) * body_b.inv_inertia)
+
+            j = -(1.0 + e) * contact_velocity_mag
+            j /= denom
+            j /= contact_count
+
+            impulse = normal * j
+            self.impulse_list[i] = impulse
+
+        for i in range(contact_count):
+            impulse = self.impulse_list[i]
+            ra = self.ra_list[i]
+            rb = self.rb_list[i]
+
+            body_a.linear_velocity -= impulse * body_a.inv_mass
+            body_a.angular_velocity -= ra.cross(impulse) * body_a.inv_inertia
+            body_b.linear_velocity += impulse * body_b.inv_mass
+            body_b.angular_velocity += rb.cross(impulse) * body_b.inv_inertia
+
+    def resolve_collision_with_rotation_and_friction(self, contact: Manifold):
+        bodyA = contact.bodyA
+        bodyB = contact.bodyB
+        normal = contact.normal
+        contact1 = contact.contact1
+        contact2 = contact.contact2
+        print(contact1, contact2)
+        contact_count = contact.contact_count
+
+        e = min(bodyA.matter.restitution, bodyB.matter.restitution)
+
+        sf = (bodyA.matter.static_friction + bodyB.matter.static_friction) * 0.5
+        df = (bodyA.matter.dynamic_friction + bodyB.matter.dynamic_friction) * 0.5
+
+        self.contact_list = [contact1, contact2]
+
+        self.impulse_list = [Vector2() for _ in range(contact_count)]
+        self.ra_list = [Vector2() for _ in range(contact_count)]
+        self.rb_list = [Vector2() for _ in range(contact_count)]
+        self.friction_impulse_list = [Vector2() for _ in range(contact_count)]
+        self.j_list = [0.0 for _ in range(contact_count)]
+
+        for i in range(contact_count):
+            ra = self.contact_list[i] - bodyA.position
+            rb = self.contact_list[i] - bodyB.position
+
+            self.ra_list[i] = ra
+            self.rb_list[i] = rb
+
+            ra_perp = Vector2(-ra.y, ra.x)
+            rb_perp = Vector2(-rb.y, rb.x)
+
+            angular_linear_velocityA = ra_perp * bodyA.angular_velocity
+            angular_linear_velocityB = rb_perp * bodyB.angular_velocity
+
+            relative_velocity = ((bodyB.linear_velocity + angular_linear_velocityB) -
+                                 (bodyA.linear_velocity + angular_linear_velocityA))
+
+            contact_velocity_mag = relative_velocity.dot(normal)
+
+            if contact_velocity_mag > 0:
+                continue
+
+            ra_perp_dot_normal = ra_perp.dot(normal)
+            rb_perp_dot_normal = rb_perp.dot(normal)
+
+            denominator = (bodyA.inv_mass + bodyB.inv_mass +
+                           (ra_perp_dot_normal ** 2) * bodyA.inv_inertia +
+                           (rb_perp_dot_normal ** 2) * bodyB.inv_inertia)
+
+            j = -(1.0 + e) * contact_velocity_mag
+            j /= denominator
+            j /= contact_count
+
+            self.j_list[i] = j
+
+            impulse = j * normal
+            self.impulse_list[i] = impulse
+
+        for i in range(contact_count):
+            impulse = self.impulse_list[i]
+            ra = self.ra_list[i]
+            rb = self.rb_list[i]
+
+            bodyA.linear_velocity -= impulse * bodyA.inv_mass
+            bodyA.angular_velocity -= ra.cross(impulse) * bodyA.inv_inertia
+            bodyB.linear_velocity += impulse * bodyB.inv_mass
+            bodyB.angular_velocity += rb.cross(impulse) * bodyB.inv_inertia
+
+        for i in range(contact_count):
+            ra = self.ra_list[i]
+            rb = self.rb_list[i]
+
+            ra_perp = Vector2(-ra.y, ra.x)
+            rb_perp = Vector2(-rb.y, rb.x)
+
+            angular_linear_velocityA = ra_perp * bodyA.angular_velocity
+            angular_linear_velocityB = rb_perp * bodyB.angular_velocity
+
+            relative_velocity = ((bodyB.linear_velocity + angular_linear_velocityB) -
+                                 (bodyA.linear_velocity + angular_linear_velocityA))
+
+            tangent = relative_velocity - relative_velocity.dot(normal) * normal
+
+            if tangent.length_squared() < 1e-6:
+                continue
+            else:
+                tangent = tangent.normalize()
+
+            ra_perp_dot_tangent = ra_perp.dot(tangent)
+            rb_perp_dot_tangent = rb_perp.dot(tangent)
+
+            denominator = (bodyA.inv_mass + bodyB.inv_mass +
+                           (ra_perp_dot_tangent ** 2) * bodyA.inv_inertia +
+                           (rb_perp_dot_tangent ** 2) * bodyB.inv_inertia)
+
+            jt = -relative_velocity.dot(tangent)
+            jt /= denominator
+            jt /= contact_count
+
+            j = self.j_list[i]
+
+            if abs(jt) <= j * sf:
+                friction_impulse = jt * tangent
+            else:
+                friction_impulse = -j * tangent * df
+
+            self.friction_impulse_list[i] = friction_impulse
+
+        for i in range(contact_count):
+            friction_impulse = self.friction_impulse_list[i]
+            ra = self.ra_list[i]
+            rb = self.rb_list[i]
+
+            bodyA.linear_velocity -= friction_impulse * bodyA.inv_mass
+            bodyA.angular_velocity -= ra.cross(friction_impulse) * bodyA.inv_inertia
+            bodyB.linear_velocity += friction_impulse * bodyB.inv_mass
+            bodyB.angular_velocity += rb.cross(friction_impulse) * bodyB.inv_inertia

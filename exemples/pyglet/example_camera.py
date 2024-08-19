@@ -89,11 +89,9 @@ def on_draw():
             shapes.Circle(nx, ny, body.shape.radius * camera.zoom, color=body.matter.color).draw()
 
         elif body.shape.type == ShapeType.BOX:
-            nx, ny = camera.world_to_screen(body.position.x, body.position.y)
-            box_shape = shapes.Rectangle(nx, ny, body.shape.width * camera.zoom, body.shape.height * camera.zoom, color=body.matter.color)
-            box_shape.anchor_position = body.shape.width / 2 * camera.zoom, body.shape.height / 2 * camera.zoom
-            box_shape.rotation = -math.degrees(body.angle)
-            box_shape.draw()
+            vertices = body.get_vertices(tuple=True)
+            vertices_on_screen = [camera.world_to_screen(v[0], v[1]) for v in vertices]
+            shapes.Polygon(*vertices_on_screen, color=body.matter.color).draw()
 
 @window.event
 def on_mouse_scroll(x, y, scroll_x, scroll_y):

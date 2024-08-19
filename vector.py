@@ -53,6 +53,9 @@ class Vector2:
     def distance(self, other: 'Vector2') -> float:
         return (self - other).length()
 
+    def distance_squared(self, other: 'Vector2') -> float:
+        return (self - other).length_squared()
+
     def dot(self, other: 'Vector2') -> float:
         return self.x * other.x + self.y * other.y
 

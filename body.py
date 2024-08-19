@@ -1,34 +1,50 @@
 from AABB import AABB
-from shape import ShapeType
+from matter import Matter
+from shape import ShapeType, Box, Circle
 from transform import Transform
 from vector import Vector2
 
 
 class Body:
+    position: Vector2
+    linear_velocity: Vector2
+    angle: float
+    angular_velocity: float
+    force: Vector2
+
+    shape: Box | Circle
+    matter: Matter
+    is_static: bool
+
+    mass: float
+    inv_mass: float
+    inertia: float
+    inv_inertia: float
+
+    transform_update_required: bool
+    aabb_update_required: bool
+
     def __init__(self, shape, matter, x, y, angle=0, is_static=False):
 
         self.position = Vector2(x, y)
-        self._linear_velocity = Vector2()
+        self.linear_velocity = Vector2()
         self.angle = angle
         self.angular_velocity = 0
-
         self.force = Vector2()
 
         self.shape = shape
-        self.is_static = is_static
-
         self.matter = matter
-        self.matter.density = 0 if is_static else self.matter.density
-        self.mass = self.shape.area * self.matter.density
-        self.inv_mass = 1 / self.mass if self.mass != 0 else 0
+        self.is_static = is_static
+        self.mass = 0
+        self.inv_mass = 0
+        self.inertia = 0
+        self.inv_inertia = 0
 
         if self.shape.type is ShapeType.BOX:
             self.vertices = self.create_box_vertices(self.shape.width, self.shape.height)
-            self.triangles = self.create_box_triangles()
             self.transformed_vertices = self.vertices
         else:
             self.vertices = None
-            self.triangles = None
             self.transformed_vertices = None
 
         self.AABB = None
@@ -36,14 +52,21 @@ class Body:
         self.transform_update_required = True
         self.aabb_update_required = True
 
-    @property
-    def linear_velocity(self):
-        return self._linear_velocity
+        self.init()
 
-    @linear_velocity.setter
-    def linear_velocity(self, value: Vector2):
-        self._linear_velocity = value
+    def init(self):
+        self.matter.density = 0 if self.is_static else self.matter.density
 
+        self.mass = self.shape.area * self.matter.density
+        self.inv_mass = 1 / self.mass if self.mass != 0 else 0
+
+        if self.shape.type is ShapeType.BOX:
+            self.inertia = (1.0 / 12.0) * self.mass * (self.shape.width ** 2 + self.shape.height ** 2)
+        elif self.shape.type is ShapeType.CIRCLE:
+            self.inertia = (1.0 / 2.0) * self.mass * self.shape.radius ** 2
+        else:
+            raise ValueError("Invalid shape type")
+        self.inv_inertia = 1 / self.inertia if self.inertia != 0 else 0
 
     @staticmethod
     def create_box_vertices(width, height):
@@ -126,7 +149,6 @@ class Body:
         self.angle += self.angular_velocity * dt
 
         self.force.zero()
-        #print(self.linear_velocity)
         self.transform_update_required = True
         self.aabb_update_required = True
 
@@ -142,6 +164,11 @@ class Body:
 
     def rotate(self, amount):
         self.angle += amount
+        self.transform_update_required = True
+        self.aabb_update_required = True
+
+    def rotate_to(self, angle):
+        self.angle = angle
         self.transform_update_required = True
         self.aabb_update_required = True
 
