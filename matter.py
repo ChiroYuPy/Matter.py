@@ -3,3 +3,9 @@ class Matter:
         self.density = density
         self.restitution = restitution
         self.color = color
+
+        if density < 0:
+            raise ValueError("Density must be a positive value.")
+
+        if restitution < 0:
+            raise ValueError("Restitution must be a positive value.")

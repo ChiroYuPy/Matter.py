@@ -68,7 +68,8 @@ world.add_body([body1, body2, ground, slope])
 window = Window(800, 600, "Matter.py")
 
 # camera creation
-camera = Camera(window.width / 2, window.height / 2)
+camera = Camera()
+camera.set_center(window.width / 2, window.height / 2)
 
 # update world
 def update(dt):
@@ -97,14 +98,14 @@ def on_draw():
 @window.event
 def on_mouse_scroll(x, y, scroll_x, scroll_y):
     if scroll_y > 0:
-        camera.zoom_in()
+        camera.zoom_in(x, y) # zoom in at the mouse position
     else:
-        camera.zoom_out()
+        camera.zoom_out(x, y) # zoom out at the mouse position
 
 @window.event
 def on_mouse_drag(x, y, dx, dy, buttons, modifiers):
     if buttons == mouse.RIGHT:
-        camera.move(-dx / camera.zoom, -dy / camera.zoom)
+        camera.move(-dx / camera.zoom, -dy / camera.zoom) # move the camera with zoom compensation
 
 # run the app
 run()

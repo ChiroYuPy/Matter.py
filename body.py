@@ -8,7 +8,7 @@ class Body:
     def __init__(self, shape, matter, x, y, angle=0, is_static=False):
 
         self.position = Vector2(x, y)
-        self.linear_velocity = Vector2()
+        self._linear_velocity = Vector2()
         self.angle = angle
         self.angular_velocity = 0
 
@@ -18,6 +18,7 @@ class Body:
         self.is_static = is_static
 
         self.matter = matter
+        self.matter.density = 0 if is_static else self.matter.density
         self.mass = self.shape.area * self.matter.density
         self.inv_mass = 1 / self.mass if self.mass != 0 else 0
 
@@ -35,6 +36,13 @@ class Body:
         self.transform_update_required = True
         self.aabb_update_required = True
 
+    @property
+    def linear_velocity(self):
+        return self._linear_velocity
+
+    @linear_velocity.setter
+    def linear_velocity(self, value: Vector2):
+        self._linear_velocity = value
 
 
     @staticmethod
@@ -118,6 +126,7 @@ class Body:
         self.angle += self.angular_velocity * dt
 
         self.force.zero()
+        #print(self.linear_velocity)
         self.transform_update_required = True
         self.aabb_update_required = True
 
@@ -136,5 +145,5 @@ class Body:
         self.transform_update_required = True
         self.aabb_update_required = True
 
-    def apply_force(self, force):
+    def apply_force(self, force: Vector2):
         self.force += force

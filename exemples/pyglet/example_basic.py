@@ -23,7 +23,7 @@ The script combines Pyglet for graphical rendering with the Matter.py engine for
 
 import math
 
-# pyglet imports
+# Pyglet imports
 from pyglet import shapes
 from pyglet.clock import schedule_interval
 from pyglet.window import Window
@@ -38,65 +38,66 @@ from world import World
 
 ############################### Matter.py Initialization ###############################
 
-# world creation
-world = World(gravity=Vector2(0, -9.81*10))
+# Create the physical world with gravity
+world = World(gravity=Vector2(0, -9.81 * 10))  # Gravity scaled for simulation
 
-# shapes creation
-circle = Circle(25)
-cube = Box(40, 40)
+# Define shapes for dynamic bodies
+circle = Circle(25)  # Circle with a radius of 25
+cube = Box(40, 40)   # Square box with width and height of 40
 
-# matter creation
-dynamic_matter = Matter(density=1, restitution=0.5, color=(127, 160, 80))
-static_matter = Matter(density=1, restitution=0.5, color=(64, 64, 64))
+# Define material properties for dynamic and static bodies
+dynamic_matter = Matter(density=1, restitution=0.5, color=(127, 160, 80))  # Dynamic bodies
+static_matter = Matter(density=0, restitution=0.5, color=(64, 64, 64))    # Static bodies
 
-# dynamic bodies creation
-body1 = Body(circle, dynamic_matter, 400, 400)
-body2 = Body(cube, dynamic_matter, 350, 350, angle=math.radians(30))
+# Create dynamic bodies and initialize their positions and properties
+body1 = Body(circle, dynamic_matter, 400, 400)  # Circle body positioned at (400, 400)
+body2 = Body(cube, dynamic_matter, 350, 350, angle=math.radians(30))  # Rotated cube body positioned at (350, 350)
 
-# static bodies creation
-ground = Body(Box(768, 16), static_matter, 400, 24, is_static=True)
-slope = Body(Box(200, 20), static_matter, 350, 200, is_static=True, angle=math.radians(-30))
+# Create static bodies and set their positions, angles, and static status
+ground = Body(Box(768, 16), static_matter, 400, 24, is_static=True)  # Ground plane
+slope = Body(Box(200, 20), static_matter, 350, 200, is_static=True, angle=math.radians(-30))  # Inclined slope
 
-# add bodies to the world
+# Add all created bodies to the world
 world.add_body([body1, body2, ground, slope])
 
 ################################# Pyglet Initialization #################################
 
-# window creation
-window = Window(800, 600, "Matter.py")
+# Create a Pyglet window for rendering
+window = Window(800, 600, "Matter.py Physics Engine")
 
-# update world
+# Update function to advance the simulation
 def update(dt):
-    world.step(dt, iterations=8)
+    world.step(dt, iterations=8)  # Step the simulation with fixed time step
 
+# Schedule the update function to be called at 60 FPS
 schedule_interval(update, 1/60)
 
-# draw bodies
+# Event handler for drawing the simulation
 @window.event
 def on_draw():
-    window.clear()
+    window.clear()  # Clear the window before drawing
 
     for body in world.bodies:
-
         if body.shape.type == ShapeType.CIRCLE:
+            # Draw a circle body
             shapes.Circle(body.position.x, body.position.y, body.shape.radius, color=body.matter.color).draw()
 
         elif body.shape.type == ShapeType.BOX:
-            box_shape = shapes.Rectangle(body.position.x, body.position.y, body.shape.width, body.shape.height, color=body.matter.color)
-            box_shape.anchor_position = body.shape.width / 2, body.shape.height / 2
-            box_shape.rotation = -math.degrees(body.angle)
-            box_shape.draw()
 
+
+            box = shapes.Polygon(*body.get_vertices(tuple=True), color=body.matter.color)
+            box.draw()
+
+# Event handler for mouse clicks to create new bodies
 @window.event
 def on_mouse_press(x, y, button, modifiers):
-    if button == 1:
-        body = Body(circle, dynamic_matter, x, y)
+    if button == 1:  # Left mouse button
+        body = Body(circle, dynamic_matter, x, y)  # Create and add a circle body
         world.add_body(body)
 
-    elif button == 4:
-        body = Body(cube, dynamic_matter, x, y)
+    elif button == 4:  # Right mouse button
+        body = Body(cube, dynamic_matter, x, y)  # Create and add a cube body
         world.add_body(body)
 
-
-# run the app
+# Start the Pyglet application
 run()

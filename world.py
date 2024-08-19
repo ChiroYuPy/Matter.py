@@ -14,6 +14,10 @@ class World:
         self.contacts: List[Manifold] = []
         self.contact_points: List[Vector2] = []
 
+    @property
+    def body_count(self) -> int:
+        return len(self.bodies)
+
     def add_body(self, body: Union[List[Body], Body]):
         if isinstance(body, list):
             if any(not isinstance(b, Body) for b in body):
@@ -41,12 +45,14 @@ class World:
         self.bodies.clear()
 
     def get_body(self, index: int) -> Body:
-        if index < 0 or index >= len(self.bodies):
+        if index < 0 or index >= self.body_count:
             raise IndexError("Body index out of range.")
         return self.bodies[index]
 
     def step(self, dt: float, iterations: int = 1):
+
         iterations = max(min(iterations, self.MAX_ITERATIONS), self.MIN_ITERATIONS)
+
         self.contact_points.clear()
 
         for _ in range(iterations):
@@ -55,11 +61,11 @@ class World:
 
             self.contacts.clear()
 
-            for i in range(len(self.bodies) - 1):
+            for i in range(self.body_count - 1):
                 bodyA = self.bodies[i]
                 bodyA.AABB = bodyA.get_AABB()
 
-                for j in range(i + 1, len(self.bodies)):
+                for j in range(i + 1, self.body_count):
                     bodyB = self.bodies[j]
                     bodyB.AABB = bodyB.get_AABB()
 
@@ -94,19 +100,20 @@ class World:
 
     @staticmethod
     def resolve_collision(contact: Manifold):
+
+
         bodyA = contact.bodyA
         bodyB = contact.bodyB
         normal = contact.normal
 
         relative_velocity = bodyB.linear_velocity - bodyA.linear_velocity
-        print(bodyB.linear_velocity, bodyA.linear_velocity, relative_velocity)
 
-        if relative_velocity.dot(normal) > 0:
+        if relative_velocity.dot(normal) > 0.0:
             return
 
         e = min(bodyA.matter.restitution, bodyB.matter.restitution)
-        j = -(1 + e) * relative_velocity.dot(normal)
-        j /= bodyA.inv_mass + bodyB.inv_mass
+        j = - (1.0 + e) * relative_velocity.dot(normal)
+        j = j / (bodyA.inv_mass + bodyB.inv_mass)
 
         impulse = j * normal
 
