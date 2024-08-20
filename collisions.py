@@ -40,8 +40,8 @@ class Collisions:
         shape_type_a = bodyA.shape.type
         shape_type_b = bodyB.shape.type
 
-        if shape_type_a == ShapeType.BOX:
-            if shape_type_b == ShapeType.BOX:
+        if shape_type_a == ShapeType.BOX or shape_type_a == ShapeType.POLYGON:
+            if shape_type_b == ShapeType.BOX or shape_type_b == ShapeType.POLYGON:
                 contact1, contact2, contact_count = Collisions.find_polygons_contact_points(
                     bodyA.get_transformed_vertices(), bodyB.get_transformed_vertices())
             elif shape_type_b == ShapeType.CIRCLE:
@@ -49,7 +49,7 @@ class Collisions:
                     bodyB.position, bodyB.shape.radius, bodyA.position, bodyA.get_transformed_vertices())
                 contact_count = 1
         elif shape_type_a == ShapeType.CIRCLE:
-            if shape_type_b == ShapeType.BOX:
+            if shape_type_b == ShapeType.BOX or shape_type_b == ShapeType.POLYGON:
                 contact1 = Collisions.find_circle_polygon_contact_point(
                     bodyA.position, bodyA.shape.radius, bodyB.position, bodyB.get_transformed_vertices())
                 contact_count = 1
@@ -59,6 +59,11 @@ class Collisions:
                 contact_count = 1
 
         return contact1, contact2, contact_count
+
+    @staticmethod
+    def nearly_equal(vec1, vec2, rel_tol=1e-9, abs_tol=1e-9):
+        return (math.isclose(vec1.x, vec2.x, rel_tol=rel_tol, abs_tol=abs_tol) and
+                math.isclose(vec1.y, vec2.y, rel_tol=rel_tol, abs_tol=abs_tol))
 
     @staticmethod
     def find_polygons_contact_points(vertices_a, vertices_b):
@@ -76,7 +81,7 @@ class Collisions:
                 dist_sq, cp = Collisions.point_segment_distance(p, va, vb)
 
                 if math.isclose(dist_sq, min_dist_sq):
-                    if not math.isclose(cp.x, contact1.x) or not math.isclose(cp.y, contact1.y):
+                    if not Collisions.nearly_equal(cp, contact1):
                         contact2 = cp
                         contact_count = 2
                 elif dist_sq < min_dist_sq:
@@ -92,7 +97,7 @@ class Collisions:
                 dist_sq, cp = Collisions.point_segment_distance(p, va, vb)
 
                 if math.isclose(dist_sq, min_dist_sq):
-                    if not math.isclose(cp.x, contact1.x) or not math.isclose(cp.y, contact1.y):
+                    if not Collisions.nearly_equal(cp, contact1):
                         contact2 = cp
                         contact_count = 2
                 elif dist_sq < min_dist_sq:
@@ -134,8 +139,8 @@ class Collisions:
         shape_type_a = body_a.shape.type
         shape_type_b = body_b.shape.type
 
-        if shape_type_a == ShapeType.BOX:
-            if shape_type_b == ShapeType.BOX:
+        if shape_type_a == ShapeType.BOX or shape_type_a == ShapeType.POLYGON:
+            if shape_type_b == ShapeType.BOX or shape_type_b == ShapeType.POLYGON:
                 return Collisions.intersect_polygons(
                     body_a.position, body_a.get_transformed_vertices(),
                     body_b.position, body_b.get_transformed_vertices())
@@ -146,7 +151,7 @@ class Collisions:
                 normal = -normal
                 return result, normal, depth
         elif shape_type_a == ShapeType.CIRCLE:
-            if shape_type_b == ShapeType.BOX:
+            if shape_type_b == ShapeType.BOX or shape_type_b == ShapeType.POLYGON:
                 return Collisions.intersect_circle_polygon(
                     body_a.position, body_a.shape.radius,
                     body_b.position, body_b.get_transformed_vertices())

@@ -8,8 +8,9 @@ class World:
     MIN_ITERATIONS = 1
     MAX_ITERATIONS = 16
 
-    def __init__(self, gravity: Vector2 = Vector2(0, -9.81)):
+    def __init__(self, gravity: Vector2 = Vector2(0, -9.81), damping: float = 0.0):
         self.gravity = gravity
+        self.damping = damping
         self.bodies: List[Body] = []
         self.contact_pairs: List[(int, int)] = []
 
@@ -57,6 +58,12 @@ class World:
             raise IndexError("Body index out of range.")
         return self.bodies[index]
 
+    def get_body_by_position(self, x, y):
+        for body in self.bodies:
+            if body.shape.contains_point(body.position, Vector2(x, y)):
+                return body
+        return None
+
     def step(self, dt: float, iterations: int = 1):
 
         iterations = max(min(iterations, self.MAX_ITERATIONS), self.MIN_ITERATIONS)
@@ -103,6 +110,7 @@ class World:
 
     def step_bodies(self, dt: float, total_iterations: int):
         for body in self.bodies:
+            body.linear_velocity *= 1 - self.damping * dt
             body.step(dt, self.gravity, total_iterations)
 
     @staticmethod
@@ -116,7 +124,7 @@ class World:
             bodyB.move(mtv / 2)
 
     @staticmethod
-    def resolve_collision_basic(contact: Manifold):
+    def resolve_collision(contact: Manifold):
 
         bodyA = contact.bodyA
         bodyB = contact.bodyB
@@ -203,7 +211,6 @@ class World:
         normal = contact.normal
         contact1 = contact.contact1
         contact2 = contact.contact2
-        print(contact1, contact2)
         contact_count = contact.contact_count
 
         e = min(bodyA.matter.restitution, bodyB.matter.restitution)

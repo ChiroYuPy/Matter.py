@@ -1,3 +1,5 @@
+import math
+
 from AABB import AABB
 from matter import Matter
 from shape import ShapeType, Box, Circle
@@ -40,11 +42,9 @@ class Body:
         self.inertia = 0
         self.inv_inertia = 0
 
-        if self.shape.type is ShapeType.BOX:
-            self.vertices = self.create_box_vertices(self.shape.width, self.shape.height)
-            self.transformed_vertices = self.vertices
+        if self.shape.type is ShapeType.BOX or self.shape.type is ShapeType.POLYGON:
+            self.transformed_vertices = self.shape.vertices
         else:
-            self.vertices = None
             self.transformed_vertices = None
 
         self.AABB = None
@@ -64,6 +64,16 @@ class Body:
             self.inertia = (1.0 / 12.0) * self.mass * (self.shape.width ** 2 + self.shape.height ** 2)
         elif self.shape.type is ShapeType.CIRCLE:
             self.inertia = (1.0 / 2.0) * self.mass * self.shape.radius ** 2
+        elif self.shape.type is ShapeType.POLYGON:
+            n = self.shape.num_points
+            R = self.shape.radius
+            if n > 2 and R > 0:
+                sin_pi_n = math.sin(math.pi / n)
+                tan_pi_n = math.tan(math.pi / n)
+                inertia = (n * R ** 2 * sin_pi_n ** 2) / tan_pi_n
+                self.inertia = inertia
+            else:
+                self.inertia = 0
         else:
             raise ValueError("Invalid shape type")
         self.inv_inertia = 1 / self.inertia if self.inertia != 0 else 0
@@ -92,7 +102,7 @@ class Body:
         if self.transform_update_required:
             transform = Transform(self.position.x, self.position.y, self.angle)
 
-            self.transformed_vertices = [Vector2.transform(v, transform) for v in self.vertices]
+            self.transformed_vertices = [Vector2.transform(v, transform) for v in self.shape.vertices]
 
             self.transform_update_required = False
 
@@ -110,6 +120,15 @@ class Body:
             max_x, max_y = float('-inf'), float('-inf')
 
             if self.shape.type is ShapeType.BOX:
+                vertices = self.get_transformed_vertices()
+
+                for v in vertices:
+                    min_x = min(min_x, v.x)
+                    min_y = min(min_y, v.y)
+                    max_x = max(max_x, v.x)
+                    max_y = max(max_y, v.y)
+
+            elif self.shape.type is ShapeType.POLYGON:
                 vertices = self.get_transformed_vertices()
 
                 for v in vertices:
@@ -140,8 +159,8 @@ class Body:
 
         dt /= iterations
 
-        # acceleration = self.force / self.mass
-        # self.linear_velocity += acceleration * dt
+        acceleration = self.force / self.mass * dt
+        self.linear_velocity += acceleration
 
         self.linear_velocity += gravity * dt
         self.position += self.linear_velocity * dt
@@ -173,4 +192,8 @@ class Body:
         self.aabb_update_required = True
 
     def apply_force(self, force: Vector2):
+        print(force)
         self.force += force
+
+    def apply_impulse(self, impulse: Vector2):
+        self.linear_velocity += impulse
